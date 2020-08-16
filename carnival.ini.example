@@ -1,0 +1,8 @@
+# Prints the names and majors of students in a sample spreadsheet:
+# https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
+spreadsheetID = 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms  # Identifier of spreadsheet to read
+
+# Print columns A and E, which correspond to indices 0 and 4.
+readRange     = Class Data!A2:E  # Range of cells to read
+reportHeader  = Name, Major      # Heading to print before data
+reportIndices = 0,4              # Indices of columns to print, zero-based relative to readRange

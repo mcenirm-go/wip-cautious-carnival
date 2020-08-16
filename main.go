@@ -19,13 +19,16 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
+	"github.com/vharitonsky/iniflags"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -95,20 +98,53 @@ var (
 	clientScopes = []string{sheets.SpreadsheetsReadonlyScope}
 )
 
-const (
-	// Prints the names and majors of students in a sample spreadsheet:
-	// https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
-	spreadsheetID = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
-	readRange     = "Class Data!A2:E"
-)
+type listOfUints struct {
+	values []uint
+	setYet bool
+}
+
+func newListOfUints(values ...uint) *listOfUints {
+	return &listOfUints{values: values}
+}
+
+func (lou *listOfUints) String() string {
+	foo := make([]string, len(lou.values))
+	for i, u := range lou.values {
+		foo[i] = strconv.Itoa(int(u))
+	}
+	return fmt.Sprint(strings.Join(foo, ","))
+}
+
+func (lou *listOfUints) Set(value string) error {
+	if !lou.setYet {
+		lou.values = []uint{}
+		lou.setYet = true
+	}
+	asStrings := strings.Split(value, ",")
+	for _, asString := range asStrings {
+		u64, err := strconv.ParseUint(asString, 0, 32)
+		if err != nil {
+			return err
+		}
+		lou.values = append(lou.values, uint(u64))
+	}
+	return nil
+}
 
 var (
-	// Print columns A and E, which correspond to indices 0 and 4.
-	reportHeadings = []string{"Name", "Major"}
-	reportIndices  = []int{0, 4}
+	spreadsheetID, readRange, reportHeader string
+	reportIndices                          = newListOfUints(0, 4)
 )
 
+func init() {
+	flag.StringVar(&spreadsheetID, "spreadsheetID", "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms", "Identifier of spreadsheet to read")
+	flag.StringVar(&readRange, "readRange", "Class Data!A2:E", "Range of cells to read")
+	flag.StringVar(&reportHeader, "reportHeader", "Name, Major", "Heading to print before data")
+	flag.Var(reportIndices, "reportIndices", "Indices of columns to print, zero-based relative to readRange")
+}
+
 func main() {
+	iniflags.Parse()
 	b, err := ioutil.ReadFile(credentialsFile)
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
@@ -134,17 +170,16 @@ func main() {
 	if len(resp.Values) == 0 {
 		fmt.Println("No data found.")
 	} else {
-		reportHeader := strings.Join(reportHeadings, ", ") + ":"
-		reportFormatPieces := make([]string, len(reportIndices))
-		reportValues := make([]interface{}, len(reportIndices))
-		for i := range reportIndices {
+		reportFormatPieces := make([]string, len(reportIndices.values))
+		reportValues := make([]interface{}, len(reportIndices.values))
+		for i := range reportIndices.values {
 			reportFormatPieces[i] = "%s"
 		}
 		reportFormat := strings.Join(reportFormatPieces, ", ") + "\n"
 
-		fmt.Println(reportHeader)
+		fmt.Println(reportHeader + ":")
 		for _, row := range resp.Values {
-			for i, rowIndex := range reportIndices {
+			for i, rowIndex := range reportIndices.values {
 				reportValues[i] = row[rowIndex]
 			}
 			fmt.Printf(reportFormat, reportValues...)
