@@ -25,9 +25,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 
+	"github.com/mcenirm-go/wip-cautious-carnival/carnival"
 	"github.com/vharitonsky/iniflags"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
@@ -98,42 +98,9 @@ var (
 	clientScopes = []string{sheets.SpreadsheetsReadonlyScope}
 )
 
-type listOfUints struct {
-	values []uint
-	setYet bool
-}
-
-func newListOfUints(values ...uint) *listOfUints {
-	return &listOfUints{values: values}
-}
-
-func (lou *listOfUints) String() string {
-	foo := make([]string, len(lou.values))
-	for i, u := range lou.values {
-		foo[i] = strconv.Itoa(int(u))
-	}
-	return fmt.Sprint(strings.Join(foo, ","))
-}
-
-func (lou *listOfUints) Set(value string) error {
-	if !lou.setYet {
-		lou.values = []uint{}
-		lou.setYet = true
-	}
-	asStrings := strings.Split(value, ",")
-	for _, asString := range asStrings {
-		u64, err := strconv.ParseUint(asString, 0, 32)
-		if err != nil {
-			return err
-		}
-		lou.values = append(lou.values, uint(u64))
-	}
-	return nil
-}
-
 var (
 	spreadsheetID, readRange, reportHeader string
-	reportIndices                          = newListOfUints(0, 4)
+	reportIndices                          = carnival.NewListOfUintsForFlag(0, 4)
 )
 
 func init() {
@@ -170,16 +137,17 @@ func main() {
 	if len(resp.Values) == 0 {
 		fmt.Println("No data found.")
 	} else {
-		reportFormatPieces := make([]string, len(reportIndices.values))
-		reportValues := make([]interface{}, len(reportIndices.values))
-		for i := range reportIndices.values {
+		indices := reportIndices.Values()
+		reportFormatPieces := make([]string, len(indices))
+		reportValues := make([]interface{}, len(indices))
+		for i := range indices {
 			reportFormatPieces[i] = "%s"
 		}
 		reportFormat := strings.Join(reportFormatPieces, ", ") + "\n"
 
 		fmt.Println(reportHeader + ":")
 		for _, row := range resp.Values {
-			for i, rowIndex := range reportIndices.values {
+			for i, rowIndex := range indices {
 				reportValues[i] = row[rowIndex]
 			}
 			fmt.Printf(reportFormat, reportValues...)
